@@ -36,6 +36,7 @@ def check(
     metadata: PostMetadata,
     overlays: list[str],
     disclosure_default: str,
+    has_end_card: bool = True,
 ) -> ComplianceReport:
     report = ComplianceReport()
     v = report.violations
@@ -96,6 +97,16 @@ def check(
                 )
             )
 
+    run("end_card")
+    if rules.render.end_card_file and not has_end_card:
+        v.append(
+            Violation(
+                rule="end_card",
+                severity=Severity.HARD,
+                message=f"required end card missing: {rules.render.end_card_file}",
+            )
+        )
+
     caption = metadata.caption.strip()
     run("caption")
     if not caption:
@@ -142,7 +153,10 @@ def check(
             )
 
     run("mentions")
-    for m in rules.required_mentions:
+    wanted = list(rules.required_mentions)
+    for platform in metadata.platforms:
+        wanted += rules.required_mentions_by_platform.get(platform, [])
+    for m in dict.fromkeys(wanted):
         if m.lower() not in mentions:
             v.append(
                 Violation(

@@ -4,10 +4,30 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 from clipforge.core.models import Platform
+
+
+class RenderRules(BaseModel):
+    """Campaign-specific render requirements."""
+
+    layout: Literal["auto", "blur_fit", "center_crop", "passthrough"] | None = None
+    full_frame: bool = Field(
+        default=False, description="Show the whole source frame (no crop), blurred fill around it"
+    )
+    safe_top: int | None = Field(default=None, ge=0, le=900)
+    safe_bottom: int | None = Field(default=None, ge=0, le=900)
+    safe_left: int | None = Field(default=None, ge=0, le=500)
+    safe_right: int | None = Field(default=None, ge=0, le=500)
+    end_card_file: str | None = Field(
+        default=None, description="File name of the end card / packshot in the campaign assets"
+    )
+    end_card_seconds: float = Field(default=2.5, ge=0.5, le=6)
+    keep_source_fps: bool = False
+    caption_words_per_line: int | None = Field(default=None, ge=1, le=8)
 
 
 class ParsedRules(BaseModel):
@@ -20,6 +40,9 @@ class ParsedRules(BaseModel):
     min_seconds: float | None = None
     max_seconds: float | None = None
     required_mentions: list[str] = Field(default_factory=list)  # e.g. ["@callofduty"]
+    required_mentions_by_platform: dict[Platform, list[str]] = Field(
+        default_factory=dict, description="Extra mentions only for one platform"
+    )
     required_hashtags: list[str] = Field(default_factory=list)
     disclosure_options: list[str] = Field(default_factory=lambda: ["#ad"])
     disclosure_own_line_first: bool = False
@@ -38,6 +61,7 @@ class ParsedRules(BaseModel):
     geo_restrictions: list[str] = Field(default_factory=list)
     min_payout_usd: float | None = None
     cap_per_clip_usd: float | None = None
+    render: RenderRules = Field(default_factory=RenderRules)
 
     @model_validator(mode="after")
     def _check(self) -> ParsedRules:

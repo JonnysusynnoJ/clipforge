@@ -40,7 +40,7 @@ from clipforge.highlights import candidates as cand
 from clipforge.highlights.features import Timeline, compute_timeline
 from clipforge.highlights.select import overlap, variants
 from clipforge.highlights.select import select as select_diverse
-from clipforge.media import contact_sheet
+from clipforge.media import contact_sheet, probe
 from clipforge.render.profiles import get_profile
 from clipforge.render.render import RenderSpec, render
 from clipforge.transcribe.whisper import TranscriptResult, Word, transcribe
@@ -277,6 +277,10 @@ def apply_scores(
 # --------------------------------------------------------------------------- render + compliance
 
 
+def campaign_assets_dir(settings: Settings, campaign: Campaign) -> Path:
+    return settings.paths.data_dir / "campaigns" / str(campaign.id) / "assets"
+
+
 def compliance_for(
     session: Session, settings: Settings, clip: ClipCandidate, render_row: RenderedClip
 ) -> ComplianceReport:
@@ -292,6 +296,7 @@ def compliance_for(
         license_note=asset.license_note,
         metadata=meta,
         overlays=list(render_row.overlay_config.get("credits", [])),
+        has_end_card=bool(render_row.overlay_config.get("end_card")),
         disclosure_default=settings.disclosure.for_language(settings.language),
     )
     render_row.compliance_report = report.model_dump(mode="json")
@@ -348,14 +353,40 @@ def stage_render(
         words = [Word(**w) for w in (transcript_row.words if transcript_row else [])]
         out = out_dir / f"clip_{clip.id}.mp4"
         try:
+            rr = rules.render
+            src = Path(asset.local_path)
+            src_info = probe(src)
+            clip_profile = profile
+            if any(
+                v is not None for v in (rr.safe_top, rr.safe_bottom, rr.safe_left, rr.safe_right)
+            ):
+                safe = profile.safe.model_copy(update={
+                    k: v for k, v in {"top": rr.safe_top, "bottom": rr.safe_bottom,
+                                      "left": rr.safe_left, "right": rr.safe_right}.items()
+                    if v is not None
+                })  # fmt: skip
+                clip_profile = profile.model_copy(update={"safe": safe})
+            fg_aspect = 4 / 3
+            if rr.full_frame and src_info.width and src_info.height:
+                fg_aspect = src_info.width / src_info.height
+            end_card = None
+            if rr.end_card_file:
+                end_card = campaign_assets_dir(settings, campaign) / rr.end_card_file
+                if not end_card.exists():
+                    raise FileNotFoundError(f"end card asset missing: {end_card}")
             res = render(
                 RenderSpec(
-                    source=Path(asset.local_path),
+                    source=src,
                     start=clip.start,
                     end=clip.end,
                     out=out,
-                    profile=profile,
-                    layout=layout,  # type: ignore[arg-type]
+                    profile=clip_profile,
+                    layout=(rr.layout or layout),  # type: ignore[arg-type]
+                    fg_aspect=fg_aspect,
+                    fps=round(src_info.fps, 3) if rr.keep_source_fps and src_info.fps else None,
+                    words_per_line=rr.caption_words_per_line,
+                    end_card=end_card,
+                    end_card_seconds=rr.end_card_seconds,
                     words=words,
                     hook_text=clip.hook_text,
                     credits=rules.required_overlays,
@@ -377,6 +408,7 @@ def stage_render(
                 "thumbnail": str(res.thumbnail),
                 "qa_sheet": str(qa),
                 "loudness_input_i": res.loudness.get("input_i"),
+                "end_card": rules.render.end_card_file,
             },
             post_metadata=PostMetadata(
                 platforms=rules.allowed_platforms, hook_text=clip.hook_text

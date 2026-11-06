@@ -6,7 +6,7 @@ import json
 import re
 import shutil
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -44,6 +44,10 @@ class RenderSpec:
     hook_seconds: float = 3.0
     credits: list[str] = field(default_factory=list)
     burn_captions: bool = True
+    fps: float | None = None  # None: profile fps
+    words_per_line: int | None = None
+    end_card: Path | None = None  # image or video appended after the clip
+    end_card_seconds: float = 2.5
 
 
 @dataclass
@@ -113,6 +117,49 @@ def _encoder() -> list[str]:
     raise RuntimeError("no H.264 encoder available")
 
 
+_IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def append_end_card(
+    main: Path, card: Path, out: Path, spec: RenderSpec, fps: float, has_audio: bool
+) -> None:
+    """Concatenate `card` (image or video, scaled with blurred fill) after `main`."""
+    if not card.exists():
+        raise FileNotFoundError(f"end card not found: {card}")
+    w, h, n = spec.profile.width, spec.profile.height, spec.end_card_seconds
+    is_image = card.suffix.lower() in _IMAGE_EXT
+    card_in = ["-loop", "1", "-t", f"{n:.3f}", "-i", str(card)] if is_image else [
+        "-t", f"{n:.3f}", "-i", str(card)
+    ]  # fmt: skip
+    card_has_audio = (not is_image) and probe(card).has_audio
+    graph = (
+        f"[1:v]split=2[cb][cf];"
+        f"[cb]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},"
+        f"gblur=sigma=40,eq=brightness=-0.12[cbg];"
+        f"[cf]scale={w}:{h}:force_original_aspect_ratio=decrease[cfg];"
+        f"[cbg][cfg]overlay=(W-w)/2:(H-h)/2,fps={fps:.3f},format=yuv420p,setsar=1,"
+        f"trim=duration={n:.3f},setpts=PTS-STARTPTS[v1];"
+    )
+    inputs = ["-i", str(main), *card_in]
+    if card_has_audio:
+        graph += f"[1:a]aresample=48000,atrim=duration={n:.3f},asetpts=PTS-STARTPTS[a1];"
+    else:
+        inputs += ["-f", "lavfi", "-t", f"{n:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+        graph += "[2:a]asetpts=PTS-STARTPTS[a1];"
+    if has_audio:
+        graph += "[0:v][0:a][v1][a1]concat=n=2:v=1:a=1[v][a]"
+        maps = ["-map", "[v]", "-map", "[a]"]
+    else:
+        graph += "[0:v][v1]concat=n=2:v=1:a=0[v]"
+        maps = ["-map", "[v]"]
+    run_ffmpeg([
+        *inputs, "-filter_complex", graph, *maps, *_encoder(),
+        "-c:a", "aac", "-b:a", spec.profile.audio_bitrate,
+        "-maxrate", spec.profile.max_bitrate, "-bufsize", "16M",
+        "-movflags", "+faststart", str(out),
+    ])  # fmt: skip
+
+
 def render(spec: RenderSpec) -> RenderResult:
     info = probe(spec.source)
     duration = spec.end - spec.start
@@ -132,11 +179,15 @@ def render(spec: RenderSpec) -> RenderResult:
     if layout == "blur_fit":
         fg_h = spec.profile.width / spec.fg_aspect
         fg_bottom = int((spec.profile.height + fg_h) / 2)
+    style = PRESETS[spec.caption_style]
+    if spec.words_per_line:
+        style = replace(style, words_per_line=spec.words_per_line)
+    fps = spec.fps or spec.profile.fps
     ass_text = build_ass(
         profile=spec.profile,
         duration=duration,
         words=rel_words if spec.burn_captions else [],
-        style=PRESETS[spec.caption_style],
+        style=style,
         hook_text=spec.hook_text,
         hook_seconds=spec.hook_seconds,
         credits=spec.credits,
@@ -146,11 +197,13 @@ def render(spec: RenderSpec) -> RenderResult:
     ass_file.write_text(ass_text, encoding="utf-8")
 
     vf = video_filter(layout, spec, info)
+    fade = "" if spec.end_card else f"fade=t=out:st={max(0.0, duration - 0.25):.3f}:d=0.25,"
     vf += (
-        f",fps={spec.profile.fps},"
+        f",fps={fps:.3f},"
         f"ass='{_filter_path(ass_file)}':fontsdir='{_filter_path(FONT_DIR)}',"
-        f"fade=t=out:st={max(0.0, duration - 0.25):.3f}:d=0.25,format=yuv420p"
+        f"{fade}format=yuv420p,setsar=1"
     )
+    main_out = spec.out.with_name(spec.out.stem + "_main.mp4") if spec.end_card else spec.out
     args = ["-ss", f"{spec.start:.3f}", "-t", f"{duration:.3f}", "-i", str(spec.source)]
     loud: dict[str, float] = {}
     if info.has_audio:
@@ -168,12 +221,15 @@ def render(spec: RenderSpec) -> RenderResult:
         "-filter_complex" if ";" in vf else "-vf", vf,
         *_encoder(),
         "-maxrate", spec.profile.max_bitrate, "-bufsize", "16M",
-        "-movflags", "+faststart", str(spec.out),
+        "-movflags", "+faststart", str(main_out),
     ]  # fmt: skip
     if ";" in vf:  # filter_complex needs explicit input label
         idx = args.index("-filter_complex")
         args[idx + 1] = "[0:v]" + vf
     run_ffmpeg(args)
+    if spec.end_card:
+        append_end_card(main_out, spec.end_card, spec.out, spec, fps, info.has_audio)
+        main_out.unlink(missing_ok=True)
 
     thumb = extract_frame(spec.out, min(1.0, duration / 2), spec.out.with_suffix(".jpg"), width=540)
     out_info = probe(spec.out)
