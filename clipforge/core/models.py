@@ -74,8 +74,20 @@ class PostStatus(StrEnum):
 class Campaign(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     whop_url: str = Field(index=True, unique=True)
+    external_id: str | None = Field(default=None, index=True)
+    title: str = ""
     brand: str
     category: str | None = None
+    description: str = ""
+    payout_type: str = "cpm"
+    platform_rates: list[dict[str, Any]] = _json(list)
+    fee_bps: int | None = None
+    requires_application: bool = False
+    launched_at: datetime | None = _ts(nullable=True, default=None)
+    submit_url: str | None = None
+    brief_url: str | None = None
+    score: float | None = None
+    score_report: dict[str, Any] = _json(dict)
     cpm_usd: float | None = None
     budget_total: float | None = None
     budget_left: float | None = None

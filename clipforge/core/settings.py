@@ -95,7 +95,26 @@ class TranscriptionConfig(BaseModel):
 
 class CampaignConfig(BaseModel):
     blocked_categories: list[str] = Field(default_factory=lambda: ["gambling", "casino"])
+    blocked_keywords: list[str] = Field(
+        default_factory=lambda: [
+            "casino", "gambling", "betting", "sportsbook", "parlay", "slots", "poker",
+            "roulette", "blackjack", "stake.com", "flip.gg", "case opening", "case battle",
+            "skin gambling", "csgoroll", "rollbit",
+            # adult / NSFW
+            "sinparty", "onlyfans", "fansly", "nsfw", "porn", "xxx", "adult content", "18+",
+        ]
+    )  # fmt: skip
+    risk_keywords: list[str] = Field(
+        default_factory=lambda: [
+            "glp-1", "weight loss", "hair restoration", "supplement", "trading", "forex",
+            "crypto", "funded", "prop firm", "politic", "election",
+        ]
+    )  # fmt: skip
+    content_language: str = "en"
     max_active: int = Field(default=3, ge=1)
+    min_budget_left_usd: float = Field(default=300, ge=0)
+    discover_sections: list[str] = Field(default_factory=lambda: ["clipping"])
+    detail_top_n: int = Field(default=25, ge=1)
 
 
 class AnalyticsConfig(BaseModel):

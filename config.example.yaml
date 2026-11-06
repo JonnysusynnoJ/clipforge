@@ -40,7 +40,12 @@ transcription:
 
 campaigns:
   blocked_categories: [gambling, casino]
+  # blocked_keywords / risk_keywords: see clipforge/core/settings.py for defaults
   max_active: 3
+  min_budget_left_usd: 300
+  content_language: en
+  discover_sections: [clipping]
+  detail_top_n: 25
 
 analytics:
   whop_fee_pct: 7.0
