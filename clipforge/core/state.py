@@ -50,6 +50,8 @@ def _require_compliance_report(session: Session, clip: ClipCandidate, actor: Act
 
 
 def _guard_approve(session: Session, clip: ClipCandidate, actor: Actor) -> None:
+    if clip.status is ClipStatus.SCHEDULED:
+        return  # unscheduling an already approved clip is not a new approval
     if actor is Actor.SYSTEM:
         raise TransitionError("approval requires a reviewer (agent or human), not the system")
     render = latest_render(session, clip)

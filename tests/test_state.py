@@ -150,3 +150,13 @@ def test_unpersisted_clip_rejected(session: Session) -> None:
         transition(
             session, ClipCandidate(asset_id=1, start=0, end=1), S.RENDERED, actor=Actor.SYSTEM
         )
+
+
+def test_unschedule_returns_to_approved_without_new_review(
+    session: Session, clip: ClipCandidate
+) -> None:
+    _to_pending(session, clip, {"decision": "approve"})
+    transition(session, clip, S.APPROVED, actor=Actor.AGENT)
+    transition(session, clip, S.SCHEDULED, actor=Actor.SYSTEM)
+    transition(session, clip, S.APPROVED, actor=Actor.SYSTEM, reason="post cancelled")
+    assert clip.status is S.APPROVED

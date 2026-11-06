@@ -12,6 +12,18 @@ publishing:
   # Approval is done by the Claude review agent (owner decision, see docs/DECISIONS.md).
   approver: agent
   min_agent_score: 7.0
+  # draft = create Metricool drafts only; live = publish automatically
+  mode: draft
+  timezone: Europe/Vienna
+  window_start_hour: 9
+  window_end_hour: 23
+  lead_minutes: 30
+
+hosting:
+  provider: r2
+  r2_account_id: ""        # Cloudflare account id
+  r2_bucket: ""            # e.g. clipforge-clips
+  public_base_url: ""      # e.g. https://pub-xxxx.r2.dev
 
 rate_limits:
   # Conservative start for the unattended test phase.

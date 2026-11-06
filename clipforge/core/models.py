@@ -168,12 +168,19 @@ class Post(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     rendered_clip_id: int = Field(foreign_key="renderedclip.id", index=True)
     account_id: int = Field(foreign_key="socialaccount.id", index=True)
+    platform: Platform | None = None
     scheduled_at: datetime = _ts()
     caption: str = ""
     disclosure_text: str
+    media_url: str | None = None
+    media_key: str | None = None
+    publisher: str = "metricool"
+    draft: bool = True
+    request_payload: dict[str, Any] = _json(dict)
     metricool_post_id: str | None = None
     planner_url: str | None = None
     published_url: str | None = None
+    error: str | None = None
     status: PostStatus = Field(default=PostStatus.PLANNED, index=True)
     created_at: datetime = _ts(default_factory=utcnow)
 

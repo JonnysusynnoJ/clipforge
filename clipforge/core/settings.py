@@ -53,6 +53,19 @@ class PublishingConfig(BaseModel):
     enabled: bool = False
     approver: Literal["agent", "human"] = "agent"
     min_agent_score: float = Field(default=7.0, ge=0, le=10)
+    # draft: posts are created as Metricool drafts (nothing goes live); live: auto-publish
+    mode: Literal["draft", "live"] = "draft"
+    timezone: str = "Europe/Vienna"
+    window_start_hour: int = Field(default=9, ge=0, le=23)
+    window_end_hour: int = Field(default=23, ge=1, le=24)
+    lead_minutes: int = Field(default=30, ge=5)
+
+
+class HostingConfig(BaseModel):
+    provider: Literal["r2", "none"] = "r2"
+    r2_account_id: str = ""
+    r2_bucket: str = ""
+    public_base_url: str = ""
 
 
 class RateLimitConfig(BaseModel):
@@ -136,6 +149,7 @@ class Settings(BaseSettings):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     language: str = "en"
     publishing: PublishingConfig = Field(default_factory=PublishingConfig)
+    hosting: HostingConfig = Field(default_factory=HostingConfig)
     rate_limits: RateLimitConfig = Field(default_factory=RateLimitConfig)
     disclosure: DisclosureConfig = Field(default_factory=DisclosureConfig)
     clips: ClipLengthConfig = Field(default_factory=ClipLengthConfig)
