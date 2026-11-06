@@ -30,6 +30,21 @@ toDate = 14 days ahead, timezone Europe/Vienna). Save all answers as a JSON list
 uv run clipforge publish-sync data/metricool_scheduled.json
 ```
 
+## 1b. Views (analytics)
+
+`uv run clipforge metrics-spec` lists the metric ids per network. For every brand in
+`brands_to_sync` and every network with published posts (instagram, tiktok), call
+`getAnalyticsDataByMetrics` with those ids (from = 35 days ago, to = now). Save each answer as
+`{"metrics": [<ids in the order you requested>], "answer": <tool answer>}` to
+`data/metrics_<network>.json`, then:
+
+```bash
+uv run clipforge metrics-import instagram data/metrics_instagram.json
+uv run clipforge earnings
+```
+
+Empty answers are normal for posts younger than ~24 h.
+
 ## 2. Campaigns
 
 ```bash
@@ -71,6 +86,17 @@ uv run clipforge publish-record <post_id> --failed --error "<message>"
 
 Blocked clips (kill switch, compliance, no slot) are reported, not worked around.
 
+## 4b. Whop submission list
+
+```bash
+uv run clipforge submit-list
+```
+Content Rewards has no API for submissions: the owner submits the listed post URLs on the
+campaign page. Put the list (campaign submit link + post URLs) into the report. When the owner
+says something was submitted, record it with `uv run clipforge submit-mark <post_id>`.
+
+On Mondays also run `uv run clipforge report` and add its "Überblick" section to the report.
+
 ## 5. Save state (always, also after errors)
 
 ```bash
@@ -80,7 +106,9 @@ uv run clipforge state push
 ## 6. Report
 
 End with a short summary (it is sent to the owner's phone):
-- posts published since yesterday, posts scheduled today (time, account, campaign)
+- posts published since yesterday (with URL), posts scheduled today (time, account, campaign)
+- views and estimated earnings so far (from `earnings`), engagement warnings
+- "Bei Whop einreichen": campaign submit link + post URLs not yet submitted
 - clips produced / approved / rejected, with one-line reasons
 - failures and blocked items
 - campaigns needing a brief link (title + contentrewards URL)

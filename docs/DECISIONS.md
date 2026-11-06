@@ -115,3 +115,21 @@ State (DB, config, campaign files, caches, unposted renders) is persisted in the
 bucket `clipforge-state` (`clipforge state pull/push`, 7 snapshots kept); source videos are
 stored there once and fetched on demand. New candidate runs never re-offer moments that were
 already used (max 30 % overlap).
+
+## D17 – Whop submission stays semi-automatic
+
+Research (Nov 2026): Content Rewards documents no creator API for submissions; only the
+dashboard flow. Whop's beta Bounty Submissions API (`/api/v1/bounty_submissions`) needs a
+personal user token and nothing documents that Content Rewards campaigns are bounties. Per the
+brief no `WhopApiSubmitter` is built. ClipForge prepares the list (submit link + URLs) in the
+daily report; the owner submits; `submit-mark` records it. Content Rewards terms ban botting
+and timing tricks that make automation look organic; ClipForge schedules openly via Metricool
+and never randomizes timing to disguise automation.
+
+## D18 – Views from Metricool analytics
+
+Instagram Reels: IGRE06 (url), IGRE23 (views), IGRE10 likes, IGRE07 comments, IGRE21 shares,
+IGRE24 avg watch time. TikTok: TKPO03/07/08/09/10/15. Metricool's YouTube video metrics are
+marked deprecated; YouTube views are not imported yet. Snapshots are matched by normalized
+post URL; earnings use the latest snapshot. Engagement below 0.5 % (likes/views, from 200
+views) is flagged because campaigns like MW4 reject such posts.

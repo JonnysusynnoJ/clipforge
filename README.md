@@ -4,7 +4,8 @@ Clipping pipeline for Whop Content Rewards campaigns: authorized long-form mater
 transcript → highlight candidates → rendered 9:16 clips → agent review → Metricool →
 Whop submission → view tracking.
 
-Status: **Phase 4** (publishing via Metricool with R2 media hosting and rate limits) on top of
+Status: **Phase 5** (views, earnings, Whop submission list, weekly report) on top of
+**Phase 4** (publishing via Metricool with R2 media hosting and rate limits) on top of
 Phase 2 (campaign discovery, rules, scoring) and Phase 1 (clip generation with agent review).
 Phase 3 (dashboard) is reduced to a later control view; see `docs/DECISIONS.md`. Operating instructions for the agent: `AGENT_RUNBOOK.md`.
 See `docs/DECISIONS.md` for owner decisions that amend the original brief.
@@ -46,6 +47,10 @@ Same steps; install ffmpeg with `apt-get install -y ffmpeg`.
 | `clipforge publish-published ID URL` | Stores the live post URL. |
 | `clipforge publish-cancel ID` / `publish-export ID` | Cancel a post / manual export (video + caption). |
 | `clipforge posts` | Lists posts. |
+| `clipforge metrics-spec` / `metrics-import NET FILE` | Metricool analytics ids per network / import views per post. |
+| `clipforge earnings` | Estimated earnings per post (CPM, min payout, cap, fee) and engagement check. |
+| `clipforge submit-list` / `submit-mark ID` | Posts to submit on Whop (with campaign link) / record a submission. |
+| `clipforge report` | Weekly markdown report (`data/reports/weekly_<year>-W<week>.md`). |
 | `clipforge state pull/push` | Restore/save state in the private R2 bucket (cloud sessions). |
 | `clipforge daily-status` | Backlog per active campaign, open posts, brands to reconcile. |
 | `clipforge publish-sync file.json` | Reconcile posts with Metricool `getScheduledPosts` output. |
