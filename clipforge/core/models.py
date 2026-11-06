@@ -121,6 +121,7 @@ class ClipCandidate(SQLModel, table=True):
     hook_text: str | None = None
     status: ClipStatus = Field(default=ClipStatus.CANDIDATE, index=True)
     error: str | None = None
+    run_id: str | None = Field(default=None, index=True)
     created_at: datetime = _ts(default_factory=utcnow)
     updated_at: datetime = _ts(default_factory=utcnow)
 
@@ -134,6 +135,8 @@ class RenderedClip(SQLModel, table=True):
     overlay_config: dict[str, Any] = _json(dict)
     compliance_report: dict[str, Any] | None = Field(default=None, sa_type=JSON)
     agent_review: dict[str, Any] | None = Field(default=None, sa_type=JSON)
+    post_metadata: dict[str, Any] = _json(dict)
+    run_id: str | None = Field(default=None, index=True)
     public_url: str | None = None
     created_at: datetime = _ts(default_factory=utcnow)
 

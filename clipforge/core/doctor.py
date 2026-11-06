@@ -146,12 +146,11 @@ def check_ml_backends(settings: Settings) -> list[CheckResult]:
             f"config={backend}, installed: {', '.join(found) or 'none (Phase 1)'}",
         )
     )
-    has_mp = _module_available("mediapipe")
     results.append(
         CheckResult(
-            "face tracking (mediapipe)",
-            Status.OK if has_mp else Status.WARN,
-            "installed" if has_mp else "not installed (Phase 1); center-crop fallback",
+            "face tracking",
+            Status.WARN,
+            "no detector bundled yet; talking-head clips use blur_fit / center_crop",
         )
     )
     return results
