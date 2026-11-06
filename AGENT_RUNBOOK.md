@@ -72,3 +72,19 @@ uv run clipforge candidates <asset_id>                              # prints run
 [{"clip_id": 29, "decision": "approve", "score": 8.2, "platforms": ["instagram"],
   "reason": "…", "caption": "Your own words @mention\n#Ad\n#Tag1 #Tag2"}]
 ```
+
+## Publishing
+
+```bash
+uv run clipforge publish-plan            # writes data/publish_queue.json
+```
+Optionally first ask Metricool for best times (`getBestTimeToPostByNetwork`) and pass them as
+`--best-hours instagram=18,20`. For every entry in `publish_queue.json` call the Metricool
+connector tool named in `tool` with exactly the given `args` (do not edit caption or media).
+Then record the answer:
+```bash
+uv run clipforge publish-record <post_id> --ok --metricool-id <data.id> --planner-url <plannerUrl>
+uv run clipforge publish-record <post_id> --failed --error "<message>"
+```
+Never retry a failed post more than once per day. If the kill switch is off or a post is
+blocked, report it in the daily summary instead of working around it.

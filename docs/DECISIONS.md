@@ -83,3 +83,26 @@ and cap.
 
 Besides gambling/casino, adult platforms (e.g. Sinparty) and skin/case gambling (e.g.
 Flip.gg) are blocked via `campaigns.blocked_keywords`. Health/finance topics are only flagged.
+
+## D13 – Phase 3 reduced
+
+With unattended publishing (D1) the human review queue is not needed. Phase 3 shrinks to a
+later read-only control view (campaigns, clips with agent reasoning, posts, kill switch).
+
+## D14 – Media hosting on Cloudflare R2
+
+Metricool needs public media URLs. Google service accounts have no storage quota for personal
+Gmail accounts, so clips are hosted on Cloudflare R2 (public r2.dev URL). Upload uses the
+Cloudflare REST API with a token stored as a network secret of the cloud environment.
+
+## D15 – Metricool via connector: findings
+
+- `createScheduledPost` with `autoPublish: true` publishes directly via the API for Instagram,
+  TikTok and YouTube; `autoPublish: false` only sends a push notification for manual posting.
+  `draft: true` creates a draft that never publishes.
+- TikTok supports `commercialContentThirdParty` (paid-partnership disclosure), set for every
+  campaign post. Custom thumbnails are ignored on personal TikTok accounts.
+- Instagram's paid-partnership label is not available through the API; disclosure is the
+  `#Ad` line in the caption (required by the campaigns anyway).
+- Media passed by URL is copied into Metricool's storage at creation time.
+- Live TikTok publishing is untested until a TikTok account is connected.

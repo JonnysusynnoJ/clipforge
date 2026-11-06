@@ -4,8 +4,9 @@ Clipping pipeline for Whop Content Rewards campaigns: authorized long-form mater
 transcript → highlight candidates → rendered 9:16 clips → agent review → Metricool →
 Whop submission → view tracking.
 
-Status: **Phase 2** (campaign discovery, rule parsing, scoring, compliance) on top of Phase 1
-(local clip generation with agent scoring/review). Operating instructions for the agent: `AGENT_RUNBOOK.md`.
+Status: **Phase 4** (publishing via Metricool with R2 media hosting and rate limits) on top of
+Phase 2 (campaign discovery, rules, scoring) and Phase 1 (clip generation with agent review).
+Phase 3 (dashboard) is reduced to a later control view; see `docs/DECISIONS.md`. Operating instructions for the agent: `AGENT_RUNBOOK.md`.
 See `docs/DECISIONS.md` for owner decisions that amend the original brief.
 
 ## Setup
@@ -40,6 +41,11 @@ Same steps; install ffmpeg with `apt-get install -y ffmpeg`.
 | `clipforge campaign-show ID` | Raw brief next to parsed rules and score report. |
 | `clipforge campaign-select` | Activates the best ready campaigns (`campaigns.max_active`). |
 | `clipforge account-add PLATFORM HANDLE` | Registers a posting account (platform fit for scoring). |
+| `clipforge publish-plan [--limit N]` | Approved clips → guards, rate-limited slots, R2 upload, Metricool requests (`data/publish_queue.json`). |
+| `clipforge publish-record ID --ok/--failed` | Records the Metricool connector result for a planned post. |
+| `clipforge publish-published ID URL` | Stores the live post URL. |
+| `clipforge publish-cancel ID` / `publish-export ID` | Cancel a post / manual export (video + caption). |
+| `clipforge posts` | Lists posts. |
 | `clipforge campaign-add spec.json` | Creates/updates a campaign from a spec file (rules + raw text). |
 | `clipforge ingest <campaign> <file> --origin URL` | Imports an authorized file (hash-deduplicated). |
 | `clipforge ingest-mediasilo <campaign> <url>` | Downloads videos from a public MediaSilo share listed in the campaign. |
@@ -62,6 +68,19 @@ Same steps; install ffmpeg with `apt-get install -y ffmpeg`.
   topics, low budget. Blocked (score 0): gambling/adult categories and keywords, no matching
   account platform, inactive campaign.
 - A campaign is *ready* only with a brief and at least one authorized material source.
+
+### Publishing
+
+- Media is uploaded to Cloudflare R2 (`hosting.*` in config.yaml) and checked for a public
+  200 before a post is created; Metricool copies the file into its own storage on creation.
+  The Cloudflare token is a network secret of the cloud environment (never in code or `.env`).
+- Hard guards before every post: kill switch (`publishing.enabled`), clip approved,
+  campaign active, compliance re-run passes, disclosure in caption, account active + public +
+  linked in Whop + has a Metricool brand, one post per clip, rate limits (default 1 post per
+  account per day, 120 min gap, 9–23 h local window).
+- `publishing.mode: draft` creates Metricool drafts only; `live` publishes automatically.
+- ClipForge does not call Metricool itself: the agent submits each queued request through the
+  Metricool connector and records the answer.
 
 ### Pipeline notes
 
