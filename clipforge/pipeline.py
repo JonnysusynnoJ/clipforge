@@ -38,14 +38,16 @@ from clipforge.core.settings import Settings
 from clipforge.core.state import TransitionError, latest_render, transition
 from clipforge.highlights import candidates as cand
 from clipforge.highlights.features import Timeline, compute_timeline
+from clipforge.highlights.select import overlap, variants
 from clipforge.highlights.select import select as select_diverse
-from clipforge.highlights.select import variants
 from clipforge.media import contact_sheet
 from clipforge.render.profiles import get_profile
 from clipforge.render.render import RenderSpec, render
 from clipforge.transcribe.whisper import TranscriptResult, Word, transcribe
 
 log = get_logger(__name__)
+
+MAX_REUSE_OVERLAP = 0.3  # max share of a new candidate that may overlap an already used clip
 
 
 # --------------------------------------------------------------------------- helpers
@@ -155,6 +157,13 @@ def stage_candidates(
         source, sha256=asset.sha256, duration=asset.duration, cache_dir=settings.paths.cache
     )
     pool = cand.generate(timeline, transcript, min_seconds=min_s, max_seconds=max_s)
+    # never offer moments again that were already used (rendered, approved, posted, ...)
+    used = [
+        cand.Candidate(start=c.start, end=c.end)
+        for c in session.exec(select(ClipCandidate).where(ClipCandidate.asset_id == asset.id)).all()
+        if c.status not in (ClipStatus.CANDIDATE, ClipStatus.REJECTED, ClipStatus.FAILED)
+    ]
+    pool = [c for c in pool if all(overlap(c, u) <= MAX_REUSE_OVERLAP for u in used)]
     hl = settings.highlights
     picked = select_diverse(pool, k=hl.top_n_for_review, non_obvious_share=hl.non_obvious_share)
     use_speech = cand.speech_mode(transcript, timeline.duration)

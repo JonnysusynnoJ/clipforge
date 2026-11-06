@@ -209,3 +209,30 @@ def test_low_agent_score_is_rejected(session: Session, settings: Settings, tmp_p
         ],
     )
     assert res["rejected"] and clip.status is ClipStatus.REJECTED
+
+
+@needs_ffmpeg
+def test_used_moments_are_not_offered_again(
+    session: Session, settings: Settings, tmp_path: Path
+) -> None:
+    from clipforge.highlights.candidates import Candidate
+    from clipforge.highlights.select import overlap
+
+    settings.highlights.top_n_for_review = 2
+    settings.highlights.variants_per_moment = 1
+    video = make_video(tmp_path / "src.mp4", seconds=24)
+    campaign = upsert_campaign(session, _spec())
+    asset = import_file(
+        session, campaign, video, sources_dir=settings.paths.sources, origin_url=SOURCE
+    )
+    empty = TranscriptResult(language="en", model="none", backend="none")
+    first, _ = stage_candidates(
+        session, settings, campaign=campaign, asset=asset, transcript=empty, run_id="u1"
+    )
+    apply_scores(session, settings, "u1", [CandidateScore(id=first[0].id or 0, score=9)])
+    stage_render(session, settings, "u1", max_clips=1)
+    used = Candidate(start=first[0].start, end=first[0].end)
+    second, _ = stage_candidates(
+        session, settings, campaign=campaign, asset=asset, transcript=empty, run_id="u2"
+    )
+    assert all(overlap(Candidate(start=c.start, end=c.end), used) <= 0.3 for c in second)
