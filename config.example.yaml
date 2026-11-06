@@ -1,0 +1,47 @@
+# Non-secret configuration. Copy to config.yaml and adjust.
+# Secrets belong in .env (see .env.example).
+
+paths:
+  data_dir: data
+
+language: en
+
+publishing:
+  # Kill switch: when false, nothing is ever sent to Metricool.
+  enabled: false
+  # Approval is done by the Claude review agent (owner decision, see docs/DECISIONS.md).
+  approver: agent
+  min_agent_score: 7.0
+
+rate_limits:
+  # Conservative start for the unattended test phase.
+  max_posts_per_account_per_day: 1
+  min_gap_minutes: 120
+
+disclosure:
+  # Appended to every post for a paid campaign; publishing is blocked without it.
+  texts:
+    en: "#ad"
+    de: "Werbung"
+
+clips:
+  min_seconds: 20
+  max_seconds: 60
+
+highlights:
+  candidate_count: 40
+  top_n_for_review: 15
+  non_obvious_share: 0.2
+  variants_per_moment: 2
+
+transcription:
+  backend: auto        # auto | mlx | faster_whisper
+  model: small.en
+
+campaigns:
+  blocked_categories: [gambling, casino]
+  max_active: 3
+
+analytics:
+  whop_fee_pct: 7.0
+  default_median_views: 1000
