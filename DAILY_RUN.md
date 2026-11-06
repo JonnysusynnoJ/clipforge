@@ -8,8 +8,12 @@ interact with social accounts (no likes, comments, follows).
 
 ## 0. Setup (stop and report if any step fails)
 
+The repository must be attached to this scheduled task as a source (then its code is trusted).
+If it is not present, do not clone it yourself: stop and report "repository not attached".
+Run every command on its own from the repo root (no `&&` chains).
+
 ```bash
-cd <repo root>          # /workspace/clipforge, or clone jonnysusynnoj/clipforge first
+cd <repo root>          # the attached checkout, usually /workspace/clipforge
 uv sync
 uv run clipforge state pull --account-id cf7a9bcc178abeae77871fa15e632bf3 --bucket clipforge-state
 uv run clipforge db upgrade
