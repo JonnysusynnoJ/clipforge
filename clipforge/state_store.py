@@ -113,7 +113,7 @@ def bundle_paths(session: Session, root: Path, data_dir: Path) -> list[Path]:
     db = rel_data / "clipforge.db"
     if (root / db).exists():
         paths.append(db)
-    for sub in ("campaigns", "cache"):
+    for sub in ("campaigns", "cache", "reports"):
         base = root / rel_data / sub
         if base.exists():
             paths += [p.relative_to(root) for p in base.rglob("*") if p.is_file()]
