@@ -570,5 +570,84 @@ def posts_cmd() -> None:
             )
 
 
+# --------------------------------------------------------------------------- state + daily
+
+state_app = typer.Typer(help="Persist state in the private R2 bucket.", no_args_is_help=True)
+app.add_typer(state_app, name="state")
+
+
+def _bucket(settings: Settings):  # type: ignore[no-untyped-def]
+    from clipforge.state_store import R2Bucket
+
+    h = settings.hosting
+    if not (h.r2_account_id and h.state_bucket):
+        raise typer.BadParameter("hosting.r2_account_id and hosting.state_bucket must be set")
+    return R2Bucket(h.r2_account_id, h.state_bucket)
+
+
+@state_app.command("pull")
+def state_pull(
+    account_id: Annotated[str, typer.Option(help="Bootstrap: R2 account id")] = "",
+    bucket: Annotated[str, typer.Option(help="Bootstrap: state bucket")] = "",
+) -> None:
+    """Restore DB, config and pending renders from the state bucket (start of a run)."""
+    from clipforge.state_store import R2Bucket, pull
+
+    target = R2Bucket(account_id, bucket) if account_id and bucket else _bucket(get_settings())
+    console.print_json(json.dumps(pull(target, Path.cwd())))
+    get_settings.cache_clear()  # config.yaml may have been restored
+
+
+@state_app.command("push")
+def state_push() -> None:
+    """Save DB, config, campaign files, caches and pending renders (end of a run)."""
+    from clipforge.state_store import push
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        result = push(_bucket(settings), s, Path.cwd(), settings.paths.data_dir)
+    console.print_json(json.dumps(result))
+
+
+@app.command("fetch-sources")
+def fetch_sources(campaign_id: int = 0) -> None:
+    """Download source videos of active campaigns from the state bucket if missing locally."""
+    from sqlmodel import select as sql_select
+
+    from clipforge.core.models import Campaign, CampaignStatus, SourceAsset
+    from clipforge.state_store import ensure_source
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        ids = [campaign_id] if campaign_id else [
+            c.id for c in s.exec(sql_select(Campaign).where(
+                Campaign.status == CampaignStatus.ACTIVE)).all()
+        ]  # fmt: skip
+        for a in s.exec(sql_select(SourceAsset)).all():
+            if a.campaign_id in ids:
+                console.print(f"asset {a.id}: {ensure_source(_bucket(settings), a, Path.cwd())}")
+
+
+@app.command("daily-status")
+def daily_status() -> None:
+    """What the daily run should do: per active campaign backlog, assets and posts."""
+    from clipforge.daily import status
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        console.print_json(json.dumps(status(s, settings), default=str))
+
+
+@app.command("publish-sync")
+def publish_sync(scheduled_file: Path) -> None:
+    """Reconcile posts with Metricool's getScheduledPosts output (JSON file)."""
+    from clipforge.daily import sync_scheduled
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        data = json.loads(scheduled_file.read_text(encoding="utf-8"))
+        console.print_json(json.dumps(sync_scheduled(s, data), default=str))
+
+
 if __name__ == "__main__":
     app()

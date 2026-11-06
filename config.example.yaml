@@ -24,6 +24,7 @@ hosting:
   r2_account_id: ""        # Cloudflare account id
   r2_bucket: ""            # e.g. clipforge-clips
   public_base_url: ""      # e.g. https://pub-xxxx.r2.dev
+  state_bucket: ""        # private bucket, e.g. clipforge-state
 
 rate_limits:
   # Conservative start for the unattended test phase.

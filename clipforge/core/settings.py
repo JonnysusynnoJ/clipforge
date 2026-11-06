@@ -66,6 +66,7 @@ class HostingConfig(BaseModel):
     r2_account_id: str = ""
     r2_bucket: str = ""
     public_base_url: str = ""
+    state_bucket: str = ""  # private bucket for DB/state between cloud sessions
 
 
 class RateLimitConfig(BaseModel):
