@@ -649,5 +649,77 @@ def publish_sync(scheduled_file: Path) -> None:
         console.print_json(json.dumps(sync_scheduled(s, data), default=str))
 
 
+# --------------------------------------------------------------------------- analytics + submit
+
+
+@app.command("metrics-spec")
+def metrics_spec() -> None:
+    """Metric ids to request from Metricool getAnalyticsDataByMetrics, per network."""
+    from clipforge.analytics.metrics import request_spec
+
+    console.print_json(json.dumps(request_spec()))
+
+
+@app.command("metrics-import")
+def metrics_import(network: str, answer_file: Path) -> None:
+    """Import a Metricool analytics answer: JSON {"metrics": [...ids], "answer": {...}}."""
+    from clipforge.analytics.metrics import import_metrics
+
+    data = json.loads(answer_file.read_text(encoding="utf-8"))
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        result = import_metrics(s, network, data["metrics"], data["answer"])
+    console.print_json(json.dumps(result))
+
+
+@app.command("earnings")
+def earnings_cmd() -> None:
+    """Estimated earnings per published post (views x CPM, min payout, cap, fee)."""
+    from dataclasses import asdict
+
+    from clipforge.analytics.earnings import estimate, totals
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        rows = estimate(s, settings)
+    console.print_json(json.dumps({"posts": [asdict(r) for r in rows], "totals": totals(rows)}))
+
+
+@app.command("submit-list")
+def submit_list() -> None:
+    """Published posts not yet submitted to Whop, with campaign submit links (markdown file)."""
+    from clipforge.submit.service import pending, write_sheet
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        groups = pending(s)
+    path = write_sheet(settings, groups)
+    console.print_json(json.dumps(groups))
+    console.print(f"sheet: {path}")
+
+
+@app.command("submit-mark")
+def submit_mark(post_id: int, status: str = "submitted", notes: str = "") -> None:
+    """Record a Whop submission (submitted/approved/rejected/paid) for a post."""
+    from clipforge.submit.service import mark
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        sub = mark(s, post_id, status, notes)
+        console.print(f"post {post_id}: whop_status={sub.whop_status}")
+
+
+@app.command("report")
+def report_cmd() -> None:
+    """Write the weekly markdown report (data/reports/weekly_<year>-W<week>.md)."""
+    from clipforge.analytics.report import write_weekly
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        path = write_weekly(s, settings)
+    console.print(path.read_text(encoding="utf-8"))
+    console.print(f"report: {path}")
+
+
 if __name__ == "__main__":
     app()
