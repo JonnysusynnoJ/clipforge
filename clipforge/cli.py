@@ -462,5 +462,113 @@ def run_cmd(
     console.print(f"timings: {report['timings_s']}  LLM cost: $0.00  report: {out}")
 
 
+# --------------------------------------------------------------------------- publishing
+
+
+def _parse_hours(values: list[str]) -> dict[str, list[int]]:
+    out: dict[str, list[int]] = {}
+    for v in values:
+        platform, _, hours = v.partition("=")
+        out[platform] = [int(h) for h in hours.split(",") if h.strip()]
+    return out
+
+
+@app.command("publish-plan")
+def publish_plan(
+    best_hours: Annotated[
+        list[str], typer.Option(help="Preferred hours per platform, e.g. instagram=18,20")
+    ] = [],  # noqa: B006
+    limit: Annotated[int, typer.Option(help="Max clips to plan in this run")] = 20,
+) -> None:
+    """Schedule approved clips: guards, rate-limit slots, R2 upload, Metricool requests."""
+    from clipforge.publish.service import plan_posts, queue
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        result = plan_posts(s, settings, preferred_hours=_parse_hours(best_hours), limit=limit)
+        pending = queue(s)
+    path = settings.paths.data_dir / "publish_queue.json"
+    path.write_text(json.dumps(pending, indent=2, ensure_ascii=False))
+    console.print_json(json.dumps(result))
+    console.print(f"{len(pending)} request(s) for the agent -> {path}")
+
+
+@app.command("publish-queue")
+def publish_queue() -> None:
+    """Print pending Metricool requests (submit each via the Metricool connector)."""
+    from clipforge.publish.service import queue
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        console.print_json(json.dumps(queue(s), ensure_ascii=False))
+
+
+@app.command("publish-record")
+def publish_record(
+    post_id: int,
+    ok: Annotated[bool, typer.Option("--ok/--failed")] = True,
+    metricool_id: str = "",
+    planner_url: str = "",
+    error: str = "",
+) -> None:
+    """Record the Metricool connector's answer for a planned post."""
+    from clipforge.publish.service import record_result
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        post = record_result(s, post_id, ok=ok, metricool_post_id=metricool_id or None,
+                             planner_url=planner_url or None, error=error or None)  # fmt: skip
+        console.print(f"post {post.id}: {post.status.value}")
+
+
+@app.command("publish-published")
+def publish_published(post_id: int, url: str) -> None:
+    """Store the live post URL once Metricool has published it."""
+    from clipforge.publish.service import mark_published
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        post = mark_published(s, post_id, url)
+        console.print(f"post {post.id}: {post.status.value} {post.published_url}")
+
+
+@app.command("publish-cancel")
+def publish_cancel(post_id: int, reason: str = "cancelled") -> None:
+    """Cancel a planned/scheduled post (also delete it in Metricool!)."""
+    from clipforge.publish.service import cancel
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        post = cancel(s, post_id, reason)
+        console.print(f"post {post.id}: {post.status.value}")
+
+
+@app.command("publish-export")
+def publish_export(post_id: int) -> None:
+    """Manual fallback: export video + caption for posting by hand."""
+    from clipforge.publish.service import export_manual
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        console.print(f"exported to {export_manual(s, settings, post_id)}")
+
+
+@app.command("posts")
+def posts_cmd() -> None:
+    """List posts with status, time and URLs."""
+    from sqlmodel import select as sql_select
+
+    from clipforge.core.models import Post
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        for p in s.exec(sql_select(Post)).all():
+            console.print(
+                f"{p.id}: {p.status.value} {p.platform.value if p.platform else '-'} "
+                f"{p.scheduled_at:%Y-%m-%d %H:%M}Z draft={p.draft} "
+                f"{p.published_url or p.planner_url or p.error or ''}"
+            )
+
+
 if __name__ == "__main__":
     app()
