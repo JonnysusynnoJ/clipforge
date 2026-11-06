@@ -118,6 +118,13 @@ already used (max 30 % overlap).
 
 ## D17 – Whop submission stays semi-automatic
 
+Verified 2026-11-06 against the official OpenAPI spec (`https://api.whop.com/api/v1/openapi.json`,
+361 paths): there is no Content Rewards endpoint at all. The only `content_rewards:*` scopes
+(`basic:read`, `basic:export`, `create`, `update`, `delete`, `moderate_submission`) belong to
+campaign owners; none lets a creator submit. Bounty submissions (`POST /bounty_submissions`,
+scope `bounty:submission:create`, user OAuth token only) target `bnty_` bounties, while Content
+Rewards campaigns use UUIDs on contentrewards.com. Nothing documents a mapping between the two.
+
 Research (Nov 2026): Content Rewards documents no creator API for submissions; only the
 dashboard flow. Whop's beta Bounty Submissions API (`/api/v1/bounty_submissions`) needs a
 personal user token and nothing documents that Content Rewards campaigns are bounties. Per the
