@@ -15,6 +15,21 @@ the judgement calls and write them as JSON files. Never edit the database direct
 - Never interact with posts (no likes, comments, follows). Never create accounts.
 - If compliance blocks a clip, fix the caption or reject it. Do not work around the check.
 
+## Campaigns
+
+```bash
+uv run clipforge discover          # refresh public campaign data + scores
+uv run clipforge campaign-select   # activate the best ready campaigns
+```
+For a campaign that needs a brief, the owner provides the brief link once:
+```bash
+uv run clipforge campaign-brief <id> --url <brief link>
+```
+Read `data/campaigns/<id>/rules_request.json` (brief text, schema, link candidates) and write
+`rules.json`. Rules: copy mentions/hashtags/disclosure exactly; `allowed_sources` only the
+official material links; `null` where the brief says nothing; never invent rules. Then
+`uv run clipforge campaign-rules <id> rules.json`; on errors fix the file and retry (max 3).
+
 ## Steps for one campaign source
 
 ```bash

@@ -63,3 +63,23 @@ talking-head podcasts).
 The first campaign links an official public MediaSilo share instead of Google Drive.
 `ingest/mediasilo.py` reads only the public share page (no login) and only if the share URL
 is in the campaign's `allowed_sources`.
+
+## D10 – Discovery from public contentrewards.com pages
+
+Campaigns live on contentrewards.com (Whop Content Rewards). The public discover page and
+campaign pages embed structured data (budget, spend, CPM per platform, minimum/maximum payout
+per clip, fee, status, Whop submission link), so no Apify actor is needed. `/api/` is
+disallowed by robots.txt and is never called; requests are rate-limited (1.5 s).
+The full brief is only shown to logged-in users, so the owner provides the brief link once
+per campaign (hard limit 4: no scraping behind logins).
+
+## D11 – Fee and payout threshold per campaign
+
+Earnings use the campaign's own fee (`configuration.fee`, basis points; MW4: 8 %) instead of
+the 7 % default, and respect the per-clip minimum payout (MW4 Instagram: $4 → 2,963 views)
+and cap.
+
+## D12 – Adult and skin-gambling campaigns blocked by default
+
+Besides gambling/casino, adult platforms (e.g. Sinparty) and skin/case gambling (e.g.
+Flip.gg) are blocked via `campaigns.blocked_keywords`. Health/finance topics are only flagged.
