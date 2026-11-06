@@ -85,6 +85,166 @@ def campaign_add(campaign_json: Path) -> None:
         console.print(f"campaign {c.id}: {c.brand} ({c.status.value})")
 
 
+@app.command("discover")
+def discover_cmd() -> None:
+    """Discover public campaigns, load details for the best ones and score them."""
+    from clipforge.campaigns.service import discover_and_score
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        rows = discover_and_score(s, settings)
+        console.print(f"{len(rows)} campaigns discovered/updated")
+    campaigns_cmd()
+
+
+@app.command("campaigns")
+def campaigns_cmd(limit: int = 20) -> None:
+    """List campaigns by score with budget, runway, expected earnings and flags."""
+    from clipforge.campaigns.service import summary_rows
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        rows = summary_rows(s, limit)
+    table = Table(title="campaigns (score = expected net $/clip at median views)")
+    for name in ("id", "title", "status", "score", "cpm", "left $", "runway", "ready", "flags"):
+        table.add_column(name, overflow="ellipsis", no_wrap=name != "flags")
+    for r in rows:
+        table.add_row(
+            str(r["id"]), r["title"], r["status"], f"{r['score'] or 0:.2f}",
+            f"{r['cpm'] or 0:.2f}", f"{r['budget_left'] or 0:,.0f}",
+            f"{r['runway_days']}d" if r["runway_days"] else "-",
+            "yes" if r["ready"] else "no", "; ".join(r["flags"])[:70],
+        )  # fmt: skip
+    console.print(table)
+
+
+@app.command("campaign-add-url")
+def campaign_add_url(url: str) -> None:
+    """Add a campaign by its public contentrewards.com URL."""
+    from clipforge.campaigns.service import add_by_url
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        c = add_by_url(s, settings, url)
+        console.print(f"campaign {c.id}: {c.title} (score {c.score})")
+
+
+@app.command("campaign-show")
+def campaign_show(campaign_id: int) -> None:
+    """Show raw brief text next to the parsed rules and the score report."""
+    from rich.columns import Columns
+    from rich.panel import Panel
+
+    from clipforge.core.models import Campaign
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        c = s.get(Campaign, campaign_id)
+        if c is None:
+            raise typer.BadParameter(f"campaign {campaign_id} not found")
+        console.print(f"[bold]{c.title or c.brand}[/] ({c.status.value}) {c.whop_url}")
+        console.print(f"submit: {c.submit_url or '-'}  brief: {c.brief_url or '-'}")
+        console.print_json(json.dumps(c.score_report or {}))
+        console.print(Columns([
+            Panel(c.raw_rules_text or "(no brief)", title="raw brief", width=70),
+            Panel(json.dumps(c.parsed_rules, indent=1) if c.parsed_rules else "(not parsed)",
+                  title="parsed rules", width=70),
+        ]))  # fmt: skip
+
+
+@app.command("campaign-brief")
+def campaign_brief(
+    campaign_id: int,
+    url: Annotated[str, typer.Option(help="Public brief link (e.g. Google Doc)")] = "",
+    text_file: Annotated[Path | None, typer.Option(help="Brief as text file")] = None,
+) -> None:
+    """Store a campaign brief and write rules_request.json for the agent."""
+    from clipforge.campaigns.service import set_brief
+    from clipforge.core.models import Campaign
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        c = s.get(Campaign, campaign_id)
+        if c is None:
+            raise typer.BadParameter(f"campaign {campaign_id} not found")
+        text = text_file.read_text(encoding="utf-8") if text_file else None
+        path = set_brief(s, settings, c, url=url or None, text=text)
+    console.print(f"brief stored; agent request: {path}")
+
+
+@app.command("campaign-rules")
+def campaign_rules_cmd(campaign_id: int, rules_file: Path) -> None:
+    """Validate the agent's parsed rules and store them (exit 1 with errors to fix)."""
+    from clipforge.campaigns.service import apply_rules
+    from clipforge.core.models import Campaign
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        c = s.get(Campaign, campaign_id)
+        if c is None:
+            raise typer.BadParameter(f"campaign {campaign_id} not found")
+        error, warnings = apply_rules(s, c, rules_file.read_text(encoding="utf-8"))
+    if error:
+        console.print(f"[red]rules rejected, fix and retry:[/]\n{error}")
+        raise typer.Exit(1)
+    for w in warnings:
+        console.print(f"[yellow]warning:[/] {w}")
+    console.print("rules stored")
+
+
+@app.command("campaign-select")
+def campaign_select() -> None:
+    """Activate the best ready campaigns (max campaigns.max_active)."""
+    from clipforge.campaigns.service import select_active
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        console.print_json(json.dumps(select_active(s, settings)))
+
+
+@app.command("account-add")
+def account_add(
+    platform: str,
+    handle: str,
+    metricool_blog_id: str = "",
+    whop_linked: bool = False,
+    daily_limit: int = 0,
+) -> None:
+    """Register a social account used for posting (or update it)."""
+    from sqlmodel import select as sql_select
+
+    from clipforge.core.models import Platform, SocialAccount
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        p = Platform(platform)
+        acc = s.exec(sql_select(SocialAccount).where(
+            SocialAccount.platform == p, SocialAccount.handle == handle)).first()  # fmt: skip
+        acc = acc or SocialAccount(platform=p, handle=handle)
+        acc.metricool_blog_id = metricool_blog_id or acc.metricool_blog_id
+        acc.whop_linked = whop_linked
+        acc.daily_limit = daily_limit or None
+        s.add(acc)
+        s.flush()
+        console.print(f"account {acc.id}: {p.value} @{handle} whop_linked={whop_linked}")
+
+
+@app.command("accounts")
+def accounts_cmd() -> None:
+    """List registered social accounts."""
+    from sqlmodel import select as sql_select
+
+    from clipforge.core.models import SocialAccount
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        for a in s.exec(sql_select(SocialAccount)).all():
+            console.print(
+                f"{a.id}: {a.platform.value} @{a.handle} metricool={a.metricool_blog_id} "
+                f"whop_linked={a.whop_linked} active={a.active}"
+            )
+
+
 @app.command("ingest")
 def ingest_cmd(
     campaign_id: int,
