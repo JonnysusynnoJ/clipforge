@@ -59,7 +59,9 @@ in the report as "needs brief link" (top 5 by score).
 ## 3. Produce clips (only for active campaigns with `produce_clips: true`)
 
 - `needs_ingest`: if an allowed source is a MediaSilo share, run
-  `uv run clipforge ingest-mediasilo <campaign_id> <url>`; for other hosts skip and report.
+  `uv run clipforge ingest-mediasilo <campaign_id> <url>`; for a Google Drive file run
+  `uv run clipforge ingest-gdrive <campaign_id> <url>`. "Quota exceeded" on Drive is normal
+  for popular files: report it and retry the next day. Other hosts: skip and report.
 - `uv run clipforge fetch-sources <campaign_id>` then `uv run clipforge candidates <asset_id>`.
 - Score (look at every contact sheet), `score`, `render <run> --max-clips 4`, review every QA
   sheet, write captions in your own words (different from earlier captions of the same
