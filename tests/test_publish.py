@@ -340,3 +340,18 @@ def test_manual_export(session: Session, pub_settings: Settings, tmp_path: Path)
     target = service.export_manual(session, pub_settings, out["planned"][0]["post_id"])
     assert (target / "video.mp4").exists()
     assert (target / "caption.txt").read_text() == GOOD_CAPTION
+
+
+def test_unsubmitted_planned_posts_expire(
+    session: Session, pub_settings: Settings, tmp_path: Path
+) -> None:
+    campaign = make_campaign(session)
+    add_account(session)
+    approved_clip(session, pub_settings, campaign, tmp_path)
+    first = service.plan_posts(session, pub_settings, now=NOW, host=FakeHost())
+    pid = first["planned"][0]["post_id"]
+    later = NOW + timedelta(days=2)
+    second = service.plan_posts(session, pub_settings, now=later, host=FakeHost())
+    assert second["expired"] == [{"post_id": pid}]
+    assert len(second["planned"]) == 1 and second["planned"][0]["post_id"] != pid
+    assert datetime.fromisoformat(second["planned"][0]["at"]) > later

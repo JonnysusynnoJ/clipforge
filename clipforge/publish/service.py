@@ -136,7 +136,15 @@ def plan_posts(
     """Schedule approved clips: pick account + slot, upload media, create Post (PLANNED)."""
     now = now or datetime.now(UTC)
     pub = settings.publishing
-    out: dict[str, list[dict[str, Any]]] = {"planned": [], "blocked": []}
+    out: dict[str, list[dict[str, Any]]] = {"planned": [], "blocked": [], "expired": []}
+    # planned posts that were never submitted and whose slot is (almost) over: free them
+    for stale in session.exec(select(Post).where(Post.status == PostStatus.PLANNED)).all():
+        if _aware(stale.scheduled_at) < now + timedelta(minutes=10):
+            stale.status = PostStatus.CANCELLED
+            stale.error = "expired: never submitted to Metricool"
+            session.add(stale)
+            out["expired"].append({"post_id": stale.id})
+    session.flush()
     clips = session.exec(
         select(ClipCandidate)
         .where(ClipCandidate.status == ClipStatus.APPROVED)
