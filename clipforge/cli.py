@@ -303,6 +303,63 @@ def ingest_mediasilo(campaign_id: int, url: str, prefer_height: int = 1080) -> N
             console.print(f"asset {asset.id}: {remote.file_name} ({asset.duration:.1f}s)")
 
 
+@app.command("ingest-gdrive")
+def ingest_gdrive(campaign_id: int, url: str) -> None:
+    """Download a public Google Drive file that the campaign lists as official material."""
+    from clipforge.core.models import Campaign
+    from clipforge.ingest import gdrive
+    from clipforge.ingest.local import authorize, import_file
+    from clipforge.pipeline import campaign_rules
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        campaign = s.get(Campaign, campaign_id)
+        if campaign is None:
+            raise typer.BadParameter(f"campaign {campaign_id} not found")
+        authorize(campaign_rules(campaign), url, "")  # raises if not an allowed source
+        local = gdrive.download(url, settings.paths.sources / "_download")
+        asset = import_file(
+            s, campaign, local, sources_dir=settings.paths.sources, origin_url=url, move=True
+        )
+        console.print(f"asset {asset.id}: {local.name} ({asset.duration:.1f}s)")
+
+
+@app.command("campaign-asset")
+def campaign_asset(campaign_id: int, file: Path, name: str = "") -> None:
+    """Store a campaign asset (e.g. end card / packshot) in data/campaigns/<id>/assets."""
+    import shutil
+
+    from clipforge.core.models import Campaign
+    from clipforge.pipeline import campaign_assets_dir
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        campaign = s.get(Campaign, campaign_id)
+        if campaign is None:
+            raise typer.BadParameter(f"campaign {campaign_id} not found")
+        target = campaign_assets_dir(settings, campaign) / (name or file.name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(file, target)
+        console.print(f"asset stored: {target}")
+
+
+@app.command("campaign-status")
+def campaign_status_cmd(campaign_id: int, status: str, reason: str = "") -> None:
+    """Set a campaign's status (e.g. ignored with a reason)."""
+    from clipforge.core.models import Campaign, CampaignStatus
+
+    settings = get_settings()
+    with db.session_scope(_engine(settings)) as s:
+        c = s.get(Campaign, campaign_id)
+        if c is None:
+            raise typer.BadParameter(f"campaign {campaign_id} not found")
+        c.status = CampaignStatus(status)
+        if reason:
+            c.score_report = {**(c.score_report or {}), "owner_note": reason}
+        s.add(c)
+        console.print(f"campaign {c.id}: {c.status.value}")
+
+
 @app.command("transcribe")
 def transcribe_cmd(asset_id: int) -> None:
     """Transcribe a source asset (cached by content hash)."""

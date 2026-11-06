@@ -191,9 +191,10 @@ def push_sources(bucket: R2Bucket, session: Session, root: Path) -> int:
         if not (a.sha256 and a.local_path) or _source_key(a) in existing:
             continue
         p = root / a.local_path
-        if p.exists():
+        if p.exists() and p.stat().st_size <= MAX_SINGLE_PUT:
             bucket.put(_source_key(a), p.read_bytes(), "video/mp4")
             n += 1
+        # larger sources are re-downloaded from their (stable) origin when needed
     return n
 
 
@@ -206,6 +207,13 @@ def ensure_source(bucket: R2Bucket, asset: SourceAsset, root: Path) -> Path:
         return p
     data = bucket.get(_source_key(asset))
     if data is None:
+        from clipforge.ingest import gdrive
+
+        if gdrive.is_drive_file(asset.origin_url):
+            tmp = gdrive.download(asset.origin_url, p.parent / "_download")
+            p.parent.mkdir(parents=True, exist_ok=True)
+            tmp.rename(p)
+            return p
         raise StateError(f"source of asset {asset.id} is neither local nor in the state bucket")
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_bytes(data)
