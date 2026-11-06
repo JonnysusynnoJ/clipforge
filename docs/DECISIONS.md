@@ -49,3 +49,17 @@ Content is English: English Whisper model, English captions, `#ad` disclosure.
 ## D7 – Campaign discovery
 
 Try the public Whop directory first; fall back to an Apify actor if that fails.
+
+## D8 – Face tracking deferred, mediapipe dropped
+
+mediapipe 1.x no longer ships the legacy face-detection solution and its task models must be
+downloaded from Google storage; OpenCV 5 wheels no longer include Haar cascades. The first
+campaign (MW4 trailer) is music-driven game footage without faces to track, so the default
+16:9 layout is `blur_fit`. `render.FaceDetector` is the hook for a detector later (needed for
+talking-head podcasts).
+
+## D9 – Campaign material from MediaSilo
+
+The first campaign links an official public MediaSilo share instead of Google Drive.
+`ingest/mediasilo.py` reads only the public share page (no login) and only if the share URL
+is in the campaign's `allowed_sources`.
