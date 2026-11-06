@@ -263,7 +263,7 @@ def test_select_active_respects_limit_and_readiness(session: Session, settings: 
     assert (
         unready.status is CampaignStatus.DISCOVERED and blocked.status is not CampaignStatus.ACTIVE
     )
-    assert result["needs_brief"][0] == unready.brand
+    assert result["needs_brief"][0] == f"{unready.brand} — {unready.whop_url}"
 
 
 def test_discover_and_score_with_fake_fetchers(session: Session, settings: Settings) -> None:

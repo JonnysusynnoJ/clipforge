@@ -209,7 +209,7 @@ def select_active(session: Session, settings: Settings) -> dict[str, list[str]]:
             c.status = CampaignStatus.PAUSED
             result["paused"].append(label)
         elif not is_ready(c) and c.status is CampaignStatus.DISCOVERED and (c.score or 0) > 0:
-            result["needs_brief"].append(label)
+            result["needs_brief"].append(f"{label} — {c.whop_url}")
         session.add(c)
     result["needs_brief"] = result["needs_brief"][:10]
     return result
