@@ -46,6 +46,10 @@ Same steps; install ffmpeg with `apt-get install -y ffmpeg`.
 | `clipforge publish-published ID URL` | Stores the live post URL. |
 | `clipforge publish-cancel ID` / `publish-export ID` | Cancel a post / manual export (video + caption). |
 | `clipforge posts` | Lists posts. |
+| `clipforge state pull/push` | Restore/save state in the private R2 bucket (cloud sessions). |
+| `clipforge daily-status` | Backlog per active campaign, open posts, brands to reconcile. |
+| `clipforge publish-sync file.json` | Reconcile posts with Metricool `getScheduledPosts` output. |
+| `clipforge fetch-sources` | Fetch source videos of active campaigns from the state bucket. |
 | `clipforge campaign-add spec.json` | Creates/updates a campaign from a spec file (rules + raw text). |
 | `clipforge ingest <campaign> <file> --origin URL` | Imports an authorized file (hash-deduplicated). |
 | `clipforge ingest-mediasilo <campaign> <url>` | Downloads videos from a public MediaSilo share listed in the campaign. |
@@ -81,6 +85,11 @@ Same steps; install ffmpeg with `apt-get install -y ffmpeg`.
 - `publishing.mode: draft` creates Metricool drafts only; `live` publishes automatically.
 - ClipForge does not call Metricool itself: the agent submits each queued request through the
   Metricool connector and records the answer.
+
+### Daily run
+
+A scheduled cloud session runs `DAILY_RUN.md` every morning: restore state, reconcile posts,
+discover/select campaigns, produce and review clips, plan and submit posts, save state, report.
 
 ### Pipeline notes
 

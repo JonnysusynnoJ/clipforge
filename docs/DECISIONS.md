@@ -106,3 +106,12 @@ Cloudflare REST API with a token stored as a network secret of the cloud environ
   `#Ad` line in the caption (required by the campaigns anyway).
 - Media passed by URL is copied into Metricool's storage at creation time.
 - Live TikTok publishing is untested until a TikTok account is connected.
+
+## D16 – Live mode and daily cloud run
+
+The owner approved the first draft and switched to `publishing.mode: live`. The daily run is a
+scheduled cloud task that starts a fresh session (Mac can be off) and follows `DAILY_RUN.md`.
+State (DB, config, campaign files, caches, unposted renders) is persisted in the private R2
+bucket `clipforge-state` (`clipforge state pull/push`, 7 snapshots kept); source videos are
+stored there once and fetched on demand. New candidate runs never re-offer moments that were
+already used (max 30 % overlap).
